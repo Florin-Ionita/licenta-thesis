@@ -5,7 +5,7 @@
 //  Adaptat după modelul oficial 2024
 // ============================================================
 
-#import "config.typ": *
+#import "prelude.typ": *
 
 #let rosu = rgb("#C00000")
 #let lightblue = rgb("#2e74b5")
@@ -197,8 +197,7 @@
 
 = #t("label_abstract")
 
-_[#t("placeholder_fill_chapter")]_
-
+#include "chapters/abstract.typ"
 
 
 // ============================================================
@@ -207,7 +206,7 @@ _[#t("placeholder_fill_chapter")]_
 
 = 1. #t("ch_intro")
 
-_[#t("placeholder_fill_chapter")]_
+#include "chapters/introduction.typ"
 
 
 // ============================================================
@@ -216,7 +215,7 @@ _[#t("placeholder_fill_chapter")]_
 
 = 2. #t("ch_theory")
 
-_[#t("placeholder_fill_chapter")]_
+#include "chapters/background.typ"
 
 
 // ============================================================
@@ -225,7 +224,7 @@ _[#t("placeholder_fill_chapter")]_
 
 = 3. #t("ch_arch")
 
-_[#t("placeholder_fill_chapter")]_
+#include "chapters/architecture.typ"
 
 
 // ============================================================
@@ -234,19 +233,7 @@ _[#t("placeholder_fill_chapter")]_
 
 = 4. #t("ch_impl")
 
-_[#t("placeholder_fill_chapter")]_
-
-== 4.1. s1
-
-_[#t("placeholder_fill_section")]_
-
-== 4.2. s2
-
-_[#t("placeholder_fill_section")]_
-
-== 4.3. s3
-
-_[#t("placeholder_fill_section")]_
+#include "chapters/implementation.typ"
 
 
 // ============================================================
@@ -255,7 +242,7 @@ _[#t("placeholder_fill_section")]_
 
 = 5. #t("ch_eval")
 
-_[#t("placeholder_fill_chapter")]_
+#include "chapters/evaluation.typ"
 
 
 // ============================================================
@@ -264,7 +251,7 @@ _[#t("placeholder_fill_chapter")]_
 
 = 6. #t("ch_discussion")
 
-_[#t("placeholder_fill_chapter")]_
+#include "chapters/discussion.typ"
 
 
 // ============================================================
@@ -273,7 +260,7 @@ _[#t("placeholder_fill_chapter")]_
 
 = 7. #t("ch_conclusions")
 
-_[#t("placeholder_fill_chapter")]_
+#include "chapters/conclusions.typ"
 
 
 // ============================================================
@@ -295,4 +282,4 @@ _[#t("placeholder_fill_chapter")]_
 
 = #t("label_appendices")
 
-_[#t("placeholder_appendix_note")]_
+#include "chapters/appendices/appendix_1.typ"
