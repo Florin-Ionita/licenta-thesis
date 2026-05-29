@@ -1,5 +1,61 @@
 #import "../prelude.typ": *
 
+// ============================================================
+//  Authentication scope of the KME  (problems & decisions)
+// ============================================================
+
+ETSI 014 clause 5.1 mandates that "all communications between SAE and KME
+shall use the HTTPS protocols (with TLS version 1.2 or higher)" and that
+"at the connection establishment, mutual authentication between SAE and KME
+shall be performed", with the SAE ID derived from the Common Name (CN) of
+the client certificate. The cryptographic machinery for that mTLS is built
+in `kme/certs.py` --- a self-signed demonstration Certificate Authority
+together with X.509 leaf-certificate issuance, where the SAE ID is carried
+in the leaf CN exactly as the standard prescribes --- and its end-to-end
+validity is exercised by an integration test
+(`test_mtls_cert_chain_round_trip`) that verifies a client certificate
+chains back to the demo CA and that its CN is the expected SAE ID.
+
+At runtime, however, the SAE identity is resolved through an injectable
+FastAPI dependency, `current_sae`, that reads an `X-SAE-ID` HTTP header
+rather than the verified peer certificate's CN. The reason is mechanical
+rather than architectural: uvicorn does not surface the verified TLS peer
+certificate to the FastAPI route handler without additional ASGI
+middleware, and writing that middleware would not change any of the
+protocol-level properties evaluated in this thesis --- key-ID
+synchronisation, no-reuse, and ETSI wire-format conformance are all
+determined by the `KeyStore` and the route handlers themselves, none of
+which depend on *how* the SAE was identified. The single-seam design
+(`current_sae` is the only place identity is resolved) means that a
+production deployment can swap the header lookup for a middleware that
+extracts the CN from the verified peer certificate, without modifying any
+other module. The deliberate simplification is documented as a known gap
+against ETSI 014 §5.1 rather than presented as compliance.
+
+// ============================================================
+//  KME-to-KME synchronisation as a simulation shortcut
+// ============================================================
+
+The two KMEs that an ETSI 014 deployment places at the ends of a QKD link
+must agree atomically on which key material backs which `key_ID` and on the
+SAE pair each delivered key is reserved for. In a distributed deployment
+the synchronisation is implemented over an authenticated KME-to-KME channel
+--- typically a two-phase commit or a Raft-replicated log --- so that a
+master pull and the corresponding peer reservation either both succeed or
+both fail. The reference implementation collapses this into an in-process
+mechanism: the two `KeyStore` instances share a single `threading.RLock`
+(installed by `link_peer`), and `take_keys` mirrors its reservation to the
+peer while still holding that lock, so the local mark and the peer mirror
+commit as one atomic step. The same lock guards `add_block` in the
+fan-out feeder, which eliminates a race in which a master could pull a key
+on KME A before the feeder had finished propagating the same block to
+KME B. Microbenchmarks confirmed that, at the demo's concurrency level,
+the shared `RLock` is not a bottleneck (it removes a per-operation lock
+hand-off that the previous per-store-lock design paid on every
+reservation). A production-grade KME would replace the shared lock with
+the appropriate distributed protocol; the rest of the storage and API code
+is unaffected by that substitution.
+
    IMPLEMENTATION CHAPTER - WRITING GUIDE (paragraph by paragraph)
 
    P1. Implementation overview

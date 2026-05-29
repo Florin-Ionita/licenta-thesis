@@ -1,5 +1,48 @@
 #import "../prelude.typ": *
 
+// ============================================================
+//  Scope of the ETSI 014 KME implementation  (prose, draft 1)
+// ============================================================
+
+The KME component implements the *single-pair* subset of ETSI GS QKD 014
+V1.1.1: one master SAE, one slave SAE, and one peer KME on the other end of
+the QKD link. Multicast key delivery to multiple slave SAEs --- the optional
+`additional_slave_SAE_IDs` field of the Key request data format (clause 6.2 of
+the standard) and the example flow of Annex B --- is out of scope, as is the
+vendor- and forward-compatibility extension surface
+(`extension_mandatory`, `extension_optional`, `status_extension`,
+`key_extension`, `key_ID_extension`, `key_container_extension`). The endpoints
+that the standard prescribes #cite(<etsi2019qkd014>) are exposed in full
+(`GET /status`, `GET`/`POST /enc_keys`, `GET`/`POST /dec_keys`), with the
+request and response data formats matching the standard verbatim for every
+field that lies inside that single-pair scope.
+
+This restriction is deliberate. Multicast and extension parameters add a
+substantial amount of KME-to-KME coordination logic (in the multicast case, a
+single master pull must atomically reserve the same key material across $k$
+peer KMEs, generalising the two-store atomic mirror used here) without
+changing any of the properties the thesis evaluates: key-ID synchronisation,
+no-reuse, ETSI wire-format conformance, and the cost of staying
+information-theoretically secure on the application data path. A production
+deployment that needs either feature would extend the existing `KeyStore`
+mirror mechanism rather than restructure it.
+
+// ============================================================
+//  Non-functional consideration: extensibility of the KME  (prose, draft 1)
+// ============================================================
+
+The KME data structures are organised so that the extension fields the
+standard reserves "for future use" can be added without touching the storage
+layer or the KME-to-KME synchronisation path. The `KeyStore` indexes blocks
+by their UUID and treats the rest of each block as opaque payload; adding a
+`key_extension` object would amount to a new optional Pydantic field on the
+`Key` model and a pass-through in the API serialiser. The same is true of
+`status_extension` and the request-side `extension_mandatory` /
+`extension_optional` arrays: parsing them is local to the request handler,
+and the storage contract is unchanged. The current implementation therefore
+leaves the extension surface unimplemented but architecturally reachable ---
+a deliberate trade-off between scope and future flexibility.
+
    ARCHITECTURE CHAPTER - WRITING GUIDE (paragraph by paragraph)
 
    P1. Solution overview
