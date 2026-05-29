@@ -1,4 +1,3 @@
-// ============================================================
 //  Template Lucrare de Diplomă / Thesis Template
 //  Facultatea de Automatică și Calculatoare
 //  UNSTPB (Politehnica București)
@@ -18,7 +17,6 @@
   numbering:    none,
   number-align: center,
 )
-
 
 // ---------- Font and paragraph ----------
 #set text(
@@ -95,6 +93,10 @@
   set text(font: "Courier New", size: 10pt)
   it
 }
+
+
+// ---------- Equations: numbered globally, like figures ----------
+#set math.equation(numbering: "(1)")
 
 
 // ============================================================
