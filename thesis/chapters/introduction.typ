@@ -107,7 +107,7 @@ enforce the protocol with post-quantum cryptography (PQC), a
 family of public-key primitives that replaces ECDLP with newer
 mathematical problems such as structured lattices
 #cite(<bernstein2009postquantum>). The approach is a hybrid key exchange: the client and server run ECDHE
-over X25519 and ML-KEM-768 in parallel, and combine the two
+over X25519 and ML-KEM-768 #cite(<nist2024mlkem>) in parallel, and combine the two
 shared secrets. This solution is used by Cloudflare
 and Google. They have enabled X25519MLKEM768 by default on a
 significant fraction of TLS 1.3 traffic since 2024. Two limitations
@@ -385,8 +385,8 @@ discussion chapter.
          followed by full Cascade reconciliation with
          back-propagation (implemented in C for performance) and
          privacy amplification.
-       - The KME exposes the standard ETSI GS QKD 014 HTTP API and
-         supports multi-node trusted-relay topologies.
+       - The KME exposes the standard ETSI GS QKD 014 HTTP API for a
+         single master/slave SAE pair across one QKD link.
 
    P10. Experiment overview — bullets
        - Evaluation has two parts.

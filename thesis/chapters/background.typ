@@ -186,15 +186,295 @@ To forge, an attacker who has seen one valid message and its tag would have
 to produce the correct tag for a different message. Because it does not know
 which function was used and collisions are rare, the best it can do is
 guess, succeeding with probability at most $epsilon$, regardless of how much
-computation it performs #cite(<stinson1991universal>). This is what makes
-the guarantee information-theoretic: it holds against any attacker, not just
-a computationally limited one. The cost, exactly as with the one-time pad,
+computation it performs, making it information-theoretic #cite(<stinson1991universal>). The cost, exactly as with the one-time pad,
 is that fresh, single-use key material (both the random choice of function
 and the mask) is needed for every message; reusing it breaks the guarantee.
 
 Together, the one-time pad and a Wegman-Carter authenticator provide
 information-theoretic confidentiality and integrity, but both demand a
-continuous supply of fresh, uniformly random, secret key shared by the two
+continuous supply of, uniformly random, secret key shared by the two
 parties. Classical key exchange, the subject of the next section, does not
-provide such a supply unconditionally; it provides keys whose secrecy is
-only computational.
+provide such a supply unconditionally, it fails to provide more than computational secure keys.
+
+== Classical key exchange in TLS
+
+The shared secret of Section 2.1 is produced by an authenticated
+Diffie-Hellman key exchange. In TLS 1.3 the only key-exchange family
+retained is #emph[ephemeral elliptic-curve Diffie-Hellman] (ECDHE)
+#cite(<rfc8446>). Each peer sends a public value derived from a fresh secret
+in its #emph[key_share], and from its own secret and the other peer's public
+value both sides arrive at the same point on an elliptic curve, which is
+then hashed into the shared secret fed to the key schedule. The curves used
+are standardised, most commonly P-256 #cite(<nist2023sp800186>) or
+Curve25519. Because the secrets are #emph[ephemeral] 
+(the secrets are used omce then discarded), the exchange gains a property called forward secrecy, meaning that, recovering one session's key does
+not compromise any other.
+
+The security of this exchange is #emph[computational]. An eavesdropper sees
+both public values but, to recover the shared secret, would have to solve
+the #emph[elliptic-curve discrete logarithm problem] (ECDLP): given a base
+point $G$ and a public multiple $Q = k G$ of it, find the scalar multiplier
+$k$ #cite(<koblitz1987elliptic>),
+
+$ "given " G "and" Q = k G, quad "find " k. $ <eq:ecdlp>
+
+No efficient classical algorithm is known for ECDLP on well-chosen curves,
+and the best known attacks take time exponential in the key size, which is
+what makes ECDHE practical and secure against classical adversaries. This
+security, however, rests on the absence of an efficient algorithm,
+not on a proof that none can exist. Cryptography has a history
+of schemes once believed secure that were later broken when a better attack
+was found, and ECDLP is one of them: it is broken by Shor's algorithm on a
+quantum computer.
+
+== The quantum threat
+
+In 1994 Shor gave a quantum algorithm that solves both integer factorisation
+and the discrete logarithm problem in polynomial time
+#cite(<shor1994algorithms>)#cite(<shor2000simple>). The same idea applies to
+the elliptic-curve discrete logarithm of @eq:ecdlp, so a sufficiently large
+quantum computer would recover the scalar $k$
+efficiently, and with it the shared secret of an ECDHE handshake. The two
+hard problems underlying essentially all deployed public-key cryptography,
+factoring for RSA and discrete logarithms for Diffie-Hellman and its
+elliptic-curve variant, are broken by this algorithm.
+
+The core of Shor's algorithm is #emph[order finding]: the hardness of these
+problems can be reduced to finding the period of a function, and a quantum
+computer finds that period efficiently using the #emph[quantum Fourier
+transform]. This is done because of the the
+superposition and interference available to a quantum computer to explore more states. What matters for this thesis is the impact of this algorithm explaining the need for information-theoretic primitives in the face of a future quantum adversary.
+
+Two qualifications keep this threat in perspective. First, the algorithm
+exists but the hardware does not yet: running Shor against the curve sizes
+used in practice requires a fault-tolerant quantum computer with far more
+stable qubits than any built so far. Second, not all cryptography is equally
+affected. Grover's algorithm gives only a quadratic speed-up for brute-force
+search #cite(<grover1996fast>), so primitives such as block
+ciphers and hash functions are weakened but not broken, and doubling the key
+length restores their security. The damage is concentrated on public-key
+key exchange, exactly the component that establishes the shared secret in
+TLS.
+
+An adversary can record encrypted
+traffic today and decrypt it once a capable quantum computer becomes
+available, an attack known as #emph[harvest now, decrypt later]
+#cite(<mosca2018cybersecurity>). Any data whose confidentiality must outlive
+the arrival of quantum computers is therefore already at risk, even though
+no such machine exists yet.
+
+== Post-quantum cryptography
+
+The first response to the quantum threat is to keep the classical
+architecture but replace the broken primitives with new ones believed to
+resist quantum attack. This is the goal of #emph[post-quantum cryptography]
+(PQC): public-key algorithms that run on ordinary computers yet rely on
+mathematical problems for which no efficient quantum algorithm is known
+#cite(<bernstein2009postquantum>). The candidates are usually grouped by the
+hard problem they build on: lattice-based schemes (short vectors in a
+lattice), code-based schemes (decoding random linear codes), hash-based
+schemes (the security of a hash function, used mainly for signatures), and
+isogeny-based schemes (paths in graphs of elliptic curves). They differ
+widely in key size, speed, and maturity, and not all resisted attack: the
+isogeny key exchange SIKE was broken by a classical attack in 2022
+#cite(<castryck2023efficient>), a reminder that "post-quantum" means "no
+known quantum attack", not "provably secure".
+
+The scheme standardised for key establishment is #emph[ML-KEM]
+#cite(<nist2024mlkem>), a lattice-based key-encapsulation mechanism derived
+from CRYSTALS-Kyber. Its security rests on the #emph[learning with errors]
+(LWE) problem. LWE asks one to recover a secret vector $s$ from many noisy
+linear equations: one is given pairs $(a_i, b_i)$ with
+
+$ b_i = chevron.l a_i, s chevron.r + e_i, $ <eq:lwe>
+
+where the $a_i$ are random, $chevron.l dot, dot chevron.r$ is the inner product,
+and each $e_i$ is a small random error. Without the errors this is ordinary
+linear algebra and $s$ is trivially recovered; the small noise terms $e_i$
+are what make the problem hard, and no efficient algorithm, classical or
+quantum, is known to solve it for suitable parameters. 
+
+In practice PQC is not deployed alone but in a #emph[hybrid] key exchange:
+the TLS handshake runs both a classical primitive (ECDHE) and a
+post-quantum one (ML-KEM) in parallel, and the shared secret is derived from both. This is the migration path currently being adopted on the Web.
+
+PQC changes the assumption but not its nature. ML-KEM is secure because no
+efficient algorithm for MLWE is known, exactly the kind of guarantee that
+Shor's algorithm overturned for ECDLP.
+
+== Quantum foundations
+
+The security of the key exchange in the next section rests on two physical
+facts about quantum measurement. The physical
+carrier of quantum key distribution is the #emph[qubit], a
+two-level quantum system whose state is a superposition of two basis states
+#cite(<nielsen2010quantum>). Two bases matter here. The
+#emph[computational] (or Z) basis is $ket(0)$ and $ket(1)$; the
+#emph[diagonal] (or X) basis is
+
+$ ket(+) = 1/sqrt(2) (ket(0) + ket(1)), quad
+  ket(-) = 1/sqrt(2) (ket(0) - ket(1)). $ <eq:diagonal-basis>
+
+The two bases are #emph[conjugate]: a state that is definite in one basis is
+uncertain in the other. Take $ket(+)$. It is perfectly defined in the X
+basis, yet in the Z basis it is an equal superposition of $ket(0)$ and
+$ket(1)$.
+
+The only way to read a qubit is to measure it, and measuring destroys the
+state. A measurement in a given basis projects the qubit onto one of that
+basis's two outcomes and returns the matching bit. If the qubit was prepared
+in the same basis, the result is deterministic and the state survives:
+measuring $ket(0)$ in the Z basis gives $0$ with certainty. If it was prepared
+in the #emph[conjugate] basis, the outcome is uniformly random and the
+original state is gone: measuring $ket(+)$ in the Z basis gives $0$ or $1$
+with equal probability, and the qubit is left in $ket(0)$ or $ket(1)$
+accordingly. An observer who does not know the preparation basis cannot read
+the bit without risking both an error and a disturbance to the state.
+
+The #emph[no-cloning theorem] makes the same point another way: no quantum
+operation copies an arbitrary unknown state #cite(<nielsen2010quantum>).
+The argument is a short proof by contradiction. Suppose such an operation
+$U$ existed, satisfying $U(ket(psi) ket(0)) = ket(psi) ket(psi)$ for every
+state $ket(psi)$. Apply it to two different states $ket(psi)$ and $ket(phi)$.
+Quantum operations preserve inner products, so equating the inner product
+before and after gives $braket(psi, phi) = braket(psi, phi)^2$. This holds
+only when $braket(psi, phi)$ is $0$ or $1$, that is, only when the two states
+are orthogonal or identical. A $U$ that clones arbitrary states would have to
+satisfy it for every pair, which is a contradiction, so no such operation exists. An
+eavesdropper therefore cannot duplicate a qubit in flight, measure one copy,
+and forward the other untouched. The disturbance from measuring in the wrong basis and
+the impossibility of cloning are the two facts that help make quantum key distribution secure against eavesdropping.
+
+== The BB84 protocol
+
+BB84, due to Bennett and Brassard #cite(<bennett1984quantum>)#cite(<nielsen2010quantum>), turns the
+facts of the previous section into a way for two parties, conventionally
+Alice and Bob, to agree on a shared random string that an eavesdropper
+cannot learn without being detected. For each bit, Alice picks a random bit
+value and a random basis, Z or X, encodes the bit in that basis (a $0$ as
+$ket(0)$ or $ket(+)$, a $1$ as $ket(1)$ or $ket(-)$) and sends the qubit to
+Bob. Bob, not knowing Alice's basis, measures each qubit in a basis he also
+chooses at random. When their bases coincide his result equals Alice's bit;
+when they differ his result is random and carries no information.
+
+After transmission the two perform #emph[sifting] over an authenticated
+public channel: they announce the basis used for each qubit, without
+revealing the bit values, and discard every position where their bases
+differed. On the remaining positions, where the bases matched, their bits
+agree in the absence of noise and eavesdropping, and these form the
+#emph[sifted key]. Since the bases are independent and uniform, on average
+half the qubits survive sifting. @tab:bb84 illustrates one round.
+
+#figure(
+  table(
+    columns: 7,
+    align: center,
+    table.header([Alice bit], [1], [0], [1], [1], [0], [0]),
+    [Alice basis], [Z], [X], [Z], [X], [Z], [X],
+    [Bob basis],   [Z], [Z], [Z], [X], [X], [X],
+    [Bases match], [yes], [no], [yes], [yes], [no], [yes],
+    [Sifted key],  [1], [], [1], [1], [], [0],
+  ),
+  caption: [One round of BB84. Positions where the bases differ are discarded;
+  the matching positions form the sifted key.],
+) <tab:bb84>
+
+But realistically, the sifted key is not yet usable. Channel noise and any eavesdropping
+introduce disagreements between Alice's and Bob's versions, measured by the
+#emph[quantum bit error rate] (QBER), the fraction of sifted positions where
+their bits differ. Alice and Bob estimate it by publicly comparing the bits
+on a random sample of the sifted key and then discarding that sample. By the
+disturbance property of the previous section, an eavesdropper who measures
+qubits in a basis she has guessed wrong corrupts them and so raises the
+QBER; an observed error rate above a protocol-dependent threshold signals
+interception and the key is aborted. A low QBER bounds how much information
+an eavesdropper can have obtained.
+
+Below that threshold the remaining errors are removed by #emph[information
+reconciliation], a public-discussion procedure that lets Alice and Bob
+correct the differing bits and reach an identical string. The implementation
+in this work uses Cascade #cite(<brassard1994secret>)
+#cite(<martinez2015demystifying>), which proceeds in passes: the key is split
+into blocks, parities of the blocks are compared, and a binary search inside
+any block with mismatched parity locates and flips the erroneous bit, with
+later passes catching errors the earlier ones missed. Reconciliation leaks
+some information to the eavesdropper, because the exchanged parities are
+public.
+
+Two adjustments then turn the reconciled string into a secure key. First, the
+information leaked during reconciliation, together with whatever the
+eavesdropper may have gathered from the channel within the QBER bound, is
+removed by #emph[privacy amplification] #cite(<bennett1995generalized>):
+Alice and Bob apply a randomly chosen function from a universal family
+(Section 2.2) to compress their shared string into a shorter one about which
+the eavesdropper's information is negligible. The leftover hash lemma
+#cite(<renner2005security>) quantifies how much the string must be shortened
+as a function of the eavesdropper's estimated knowledge, so that the output
+is, up to a negligible deviation, uniform and independent of everything the
+eavesdropper holds. The result is a shared key whose secrecy rests on the
+laws of physics rather than on any computational assumption.
+
+== The ETSI QKD 014 key delivery standard
+
+BB84 produces a shared key between two physical QKD endpoints, but an
+application such as a TLS stack cannot speak to the quantum hardware
+directly; it needs a defined interface through which to request keys. ETSI
+GS QKD 014 standardises that interface #cite(<etsi2019qkd014>). It separates
+the system into two roles: the #emph[Key Management Entity] (KME), which is
+attached to a QKD device and stores the keys it produces, and the
+#emph[Secure Application Entity] (SAE), the application that consumes them.
+Each KME serves the SAEs at its own site over a local, secured channel.
+
+A pair of SAEs obtains a shared key as follows. The master SAE asks its local
+KME for key material; the KME returns one or more keys, each paired with a
+#emph[key_ID]. The master SAE passes the key_ID to the slave SAE over its own
+application channel, and the slave SAE presents that key_ID to its own KME,
+which returns the identical key. The two SAEs then hold the same secret
+without ever exchanging it directly. The standard defines this through a
+small REST API with three endpoints: `/status`, which reports the key
+material a KME has available for a given peer; `/enc_keys`, by which the
+master SAE requests new keys and receives them with their key_IDs; and
+`/dec_keys`, by which the slave SAE retrieves a key by its key_ID.
+
+The model carries a strong assumption. The two KMEs hold the keys in the
+clear and exchange them between sites, so the security of the delivered key
+depends on each KME being uncompromised; in QKD terminology each KME is a
+#emph[trusted node]. The quantum guarantee covers the link between the QKD
+devices, but the KMEs that store and forward the keys are trusted by
+assumption, not protected by physics. This boundary is revisited when the
+threat model of the full system is stated.
+
+== Threat model
+
+The foundations above can now be combined into the adversary against which
+the rest of the thesis reasons. The adversary is assumed to be
+computationally unbounded in the quantum sense: it has access to a
+large-scale quantum computer and can therefore run Shor's algorithm, so any
+guarantee that reduces to the hardness of factoring or discrete logarithms
+is considered broken. It can read, store, and tamper with all classical
+traffic, and in particular it can mount the harvest-now-decrypt-later attack,
+recording today's traffic to break it later. On the quantum channel it may do
+anything the laws of physics permit, including intercepting and resending
+qubits, but it cannot clone an unknown state or read a qubit without
+disturbing it, by the facts of the quantum foundations section.
+
+Against this adversary the stack splits cleanly into two layers. The key
+itself is #emph[information-theoretically secure]: it is produced by BB84,
+whose secrecy follows from physics and whose residual leakage is removed by
+privacy amplification, and once installed it protects data through a one-time
+pad and a Wegman-Carter authenticator, both unconditionally secure. None of
+this rests on a computational assumption, so a quantum computer does not
+weaken it. The classical key exchange of TLS, by contrast, would be broken by
+such an adversary, which is precisely why it is replaced.
+
+Two assumptions remain outside the information-theoretic guarantee and must
+be stated plainly. First, authentication of the public channels, both the
+sifting and reconciliation discussion and the SAE-to-SAE exchange, relies on
+the parties already sharing a short secret to key the Wegman-Carter
+authenticator; the unconditional security of the key is conditional on this
+bootstrap. Second, the trusted-node assumption of the previous section: the
+KMEs hold key material in the clear, so an adversary who compromises a KME
+obtains the keys directly, bypassing the quantum guarantee entirely. The
+information-theoretic claim of this work therefore applies to the key
+agreement and the data path given uncompromised, authenticated endpoints, not
+to the physical and administrative security of the nodes themselves.
