@@ -1,157 +1,59 @@
 #import "../prelude.typ": *
 
-Computing depends on communication between peers, and the problem it solves is
-old. Smoke signals were among the earliest forms of long-distance
-communication, and they already worked the way every protocol since has: the
-two sides agreed beforehand on what a given puff or sequence meant, and that
-shared convention, not the smoke, carried the message. Modern communication is
-the same idea grown to large scale. For two parties to interoperate they follow
-shared standards that fix how a message is framed, how a session opens, and
-what each side may assume about the other. The Transport Layer Security
-protocol, described later in this chapter, is one such standard, and it carries most of the
-encrypted traffic on the Internet.
+   BACKGROUND / THEORETICAL FOUNDATION – WRITING GUIDE (paragraph by paragraph)
 
-Since the smoke, a lot has changed: communication has become an entire domain of its own, resting on a vast infrastructure that spans the planet and scales to almost any point on the globe. Most communication now happens between parties that have never met, across networks neither of them owns. A browser opens a session with a server it has no prior
-relationship with; a service calls another through infrastructure run by
-someone else entirely. The path a message takes is shared with unknown others,
-any of whom might read it or tamper with it along the way. A shared convention
-is no longer enough by itself. Agreeing on what a message means does nothing to
-keep it private or intact while it crosses ground neither party trusts.
+   P1. Domain
+        - Describe the broad field of the thesis, why it matters,
+          and which aspects are important.
+        - Example (hardware): "Computer architecture is the foundation of all computing systems; advances in arithmetic units directly affect the performance, energy efficiency, and applicability of modern accelerators."
+        - Example (software): "Scientific computing underpins discoveries in physics, chemistry, climate modelling, and engineering; the fidelity and cost of numerical simulations determine how quickly science can progress."
 
-This is why in communication it matters how it is secured.
-Security is not one property but several guarantees at once: that an outsider
-cannot read the traffic, cannot alter it without being noticed, and is in fact
-the party it claims to be. These are confidentiality, integrity, and
-authentication, and a protocol like TLS exists to deliver all three over a
-channel it cannot trust. How each is achieved, and what it assumes, is the
-subject of the section on security models later in this chapter.
+   P2. Context
+        - Zoom in on the specific setting where the problem appears and explain its relevance to the broader domain.
+        - Example (hardware): "Within computer architecture, the choice of number representation (fixed-point, floating-point, posit, etc.) determines the trade-off between accuracy, silicon area, and power consumption in hardware accelerators."
+        - Example (software): "In scientific-computing workflows, number-representation libraries are called repeatedly inside kernels; their precision and runtime influence the overall reliability and turnaround time of large simulations."
 
-How strong those guarantees must be is not fixed. It depends on what the
-information is worth and how long it has to stay protected. A session token
-that expires in minutes only has to resist an attacker for minutes. A medical
-record or a state secret may need to stay confidential for decades, long enough
-that an adversary who just stores the traffic today and waits could still break
-it later. How much security is enough, and whether the strongest guarantee is
-even within reach, is itself part of the problem.
+   P3. Problem and Motivation
+        - State clearly the gap or deficiency that motivates your work and why solving it is important.
+        - Example (hardware):
+              "There is currently no unified hardware library that offers multiple number representations together with a common benchmark suite, making fair comparison and reuse across projects difficult."
+              "This gap forces designers to re-implement basic operators for each format, increasing development time and hindering reproducible evaluation."
+        - Example (software):
+              "Existing software libraries provide many number formats but lack integrated automated testing and continuous-integration support, which hinders reproducible evaluation in large scientific-computing projects."
+              "Consequently, developers must manually run correctness and benchmark tests, slowing down experimentation and increasing the risk of inconsistent results."
 
-All of this rests on an assumption that is rarely contested. The key
-exchange that protects almost every connection on the Internet is only
-computationally secure: it holds because no known algorithm can recover the key
-in any feasible time, not because recovering it is impossible. The hardness it
-depends on is determined only by the absence of a fast enough
-attack so far.
+   P4. Related Work
+        - Discuss existing solutions (libraries, tools, architectures) and point out their limitations with respect to your goal.
+        - Example hardware paragraph 1:
+              "FloPoCo provides a rich set of floating-point cores but focuses mainly on IEEE-754 and related formats, offering limited support for posit or unum."
+        - Example hardware paragraph 2:
+              "Several open-source Chisel libraries implement individual formats (e.g., a fixed-point package) but they do not share a common test harness, making cross-format benchmarking ad-hoc."
+        - Example hardware paragraph 3:
+              "Recent proposals for programmable arithmetic units (e.g., POSH) demonstrate flexibility but lack a standardized evaluation framework."
+        - Example software paragraph 1:
+              "General-purpose libraries such as NumPy (Python) and the Julia standard library supply many number formats, yet they are not coupled to automated CI pipelines, so developers must run correctness and benchmark tests manually."
+        - Example software paragraph 2:
+              "Some research prototypes (e.g., a posit package for Julia) provide the arithmetic but lack integration with build systems like Jenkins, which limits their usability in large, collaborative scientific-computing projects."
+        - Example software paragraph 3:
+              "Workflow tools like GitHub Actions or GitLab CI can run tests, but they do not provide a ready-made library of number representations for direct reuse."
 
-This is a concern because the history of cryptography is full of
-algorithms that were trusted in their time and broken later, as computers grew
-faster and new algorithms were developed. The Data Encryption Standard (DES) algorithm was eventually broken by sheer brute force: in 1998 a
-purpose-built machine recovered a DES key in under three days
-#cite(<eff1998crackingdes>), more than its 56-bit key could withstand. To continue on this idea, the hash function MD5, once used everywhere, was shown to admit
-practical collisions in 2004 #cite(<wang2005md5>), and SHA-1 followed in 2017
-when the first full collision was produced #cite(<stevens2017sha1>). In each
-case the algorithm was considered safe right up until it was proven faulty, and the data
-it had protected was exposed as a consequence.
+   P5. Research Question / Goal
+        - State the main question or engineering goal that your thesis will answer.
+        - Example (hardware):
+              "Which number-representation format(s) give the best trade-off between accuracy, area, and power for a given class of accelerator kernels?"
+        - Example (software):
+              "How can we provide a reusable, CI-integrated software library that lets scientific-computing teams evaluate and compare diverse number representations with minimal manual effort?"
 
-To put this in perspective, there are two main problems in communication
-security. The first is that computational security is always provisional: it
-lasts only until someone finds a better attack or builds a faster machine. The
-second is worse. A large enough quantum computer would not chip away at today's
-key exchange but break it completely, solving in reasonable time the very
-problems it is built on. Even though such a quantum computer does not exist yet,
-an adversary can store encrypted traffic now and decrypt it once the capability
-exists, so data that must stay secret for decades is already at risk. This is
-what motivates the search for a guarantee that does not rest on any assumption
-about the attacker's resources, security that holds not because an attack is too
-expensive, but because it is impossible. Such a guarantee is called
-information-theoretic.
+   P6. Thesis Contributions
+        - Summarize the main contributions of the thesis in prose (2-4 items).
+        - Example (hardware):
+              "The thesis contributes: (i) a reusable Chisel number-representation library; (ii) a common benchmark framework for fair cross-format comparison; (iii) quantitative evaluation of format trade-offs on FPGA targets; and (iv) guidance for hardware designers on selecting formats for accelerator design."
+        - Example (software):
+              "The thesis contributes: (i) a Scala software library with multiple number representations; (ii) a Jenkins-based CI workflow that automates testing and benchmarking; (iii) empirical results showing accuracy-runtime-energy trade-offs for scientific kernels; and (iv) a reusable template for integrating numerical experiments into CI pipelines."
 
-== Alternative approaches and related work
+   Replace each block below (the text between _[ and ]_) with your own paragraph(s) following the order above.
 
-There are two broad ways to defend communication against the quantum threat,
-and they differ at the root. The first keeps the architecture we already have
-and only replaces the broken pieces: the vulnerable key exchange is swapped for
-one built on mathematical problems that no known quantum algorithm can solve.
-This is the idea behind post-quantum cryptography, treated in detail in the
-post-quantum cryptography section later in this chapter. It runs on ordinary
-hardware and fits inside existing protocols, which makes it the path the wider
-Internet is taking. Its security, however, is still computational: it rests on
-an assumption about how hard a problem is, a stronger assumption than before but
-an assumption all the same, and one that a future attack could in principle
-overturn just as earlier ones did.
-
-The second way changes what the guarantee rests on. Instead of a problem that
-is merely hard to solve, it uses the laws of physics, which an adversary cannot
-outcompute no matter how much power it has. Quantum key distribution takes this
-route: two parties derive a shared key whose secrecy follows from the behaviour
-of quantum measurement rather than from any unproven hardness, as the quantum
-foundations and BB84 sections develop. The cost is that it needs dedicated
-quantum hardware and a physical channel between the parties, where post-quantum
-cryptography needs only software. This thesis follows the second route, using a
-QKD-derived key to drive an information-theoretically secure channel.
-
-Integrating quantum-distributed keys into a standard secure-channel protocol
-has been attempted before. Rubio Garcia et al. #cite(<rubiogarcia2024qrtls>)
-build quantum-resistant TLS by feeding a QKD-delivered key into the handshake,
-combining it with the negotiated secret so that the session survives even if
-the classical exchange is broken. Notably, they discuss using the QKD key as a
-one-time pad but set that option aside as too costly, and protect the data with
-a conventional cipher such as AES-GCM instead. The transport therefore stays
-computationally secure: the QKD key improves how the secret is established, but
-the data is still guarded by a computational primitive. This thesis takes the
-option they declined. The QKD key is not handed to a block cipher but consumed
-directly by a one-time pad and a Wegman-Carter authenticator, so the
-confidentiality and integrity of the data are themselves information-theoretic,
-and the cost of doing so is exactly what this work sets out to measure.
-
-A related and now widely deployed line of work hardens the classical handshake
-without QKD at all. Hybrid key exchange, as specified for TLS 1.3 by Stebila et
-al. #cite(<stebila2025hybrid>), runs a post-quantum KEM such as ML-KEM
-alongside the ordinary elliptic-curve exchange and derives the session secret
-from both, so the connection holds as long as either component resists attack.
-This is the migration path the wider Internet is taking, and it is pragmatic:
-it needs no new hardware and degrades gracefully. Its guarantee, however, is
-still computational on the data path, resting on the conjectured hardness of
-the lattice problem behind ML-KEM, detailed in the post-quantum cryptography
-section. This thesis takes the opposite position, keeping the data path purely
-information-theoretic and treating the computational assumptions as something
-to remove rather than to fall back on.
-
-== Goal and contributions
-
-The question this thesis sets out to answer is whether a standard secure
-channel can be made #emph[information-theoretically secure] end to end, using a
-key produced by quantum key distribution, and at what cost. Concretely: can the
-key-exchange and data-protection primitives of TLS 1.3 be replaced by ones
-whose security rests on physics and on Shannon's bounds rather than on
-computational hardness, while keeping the surrounding protocol structure
-intact, and what price in throughput, latency, and key consumption does that
-replacement carry?
-
-In answering it, this thesis makes the following contributions.
-
-A working end-to-end implementation of QTLS-over-QKD, in which the TLS 1.3
-architecture is preserved but its cryptographic core is replaced: the ECDHE key
-exchange by a QKD key fetched over the ETSI GS QKD 014 interface, the AES-GCM
-record protection by a one-time pad, and the HMAC authentication by a
-Wegman-Carter code over GF($2^128$). The stack keeps the TLS data path
-information-theoretic rather than re-keying a classical cipher, the option that
-existing QKD-in-TLS work set aside as too costly.
-
-A self-contained QKD layer: a BB84 simulation followed by full Cascade
-information reconciliation and privacy amplification, producing identical,
-secret keys at the two endpoints and feeding them into a single-pair ETSI 014
-Key Management Entity.
-
-An empirical evaluation of what unconditional security costs on the data path,
-measuring handshake latency, bulk throughput, and per-record key consumption
-against a classical TLS 1.3 baseline, and comparing the key-establishment step
-against both X25519 and ML-KEM-768.
-
-An honest account of the boundary of the guarantee: a threat model that states
-plainly which parts are information-theoretic and which rest on assumptions
-(the authentication bootstrap and the trusted-node nature of the KMEs), so the
-claim is neither overstated nor hidden.
-
-== TLS 1.3 handshake <sec:tls>
+== TLS 1.3 handshake
 
 TLS 1.3 is the transport-layer protocol that secures the vast majority of
 encrypted traffic on the Internet today #cite(<rfc8446>). A TLS connection
@@ -211,7 +113,7 @@ that follows. Second, TLS 1.3 specifies the message flow and the key
 schedule, but the actual mechanism that produces the shared secret can be implemented in different variants. The next section makes precise what kind of security guarantee
 this primitive is expected to provide.
 
-== Security models and information-theoretic primitives <sec:security-models>
+== Security models and information-theoretic primitives
 
 Cryptographic guarantees come in two strengths. A scheme is
 #emph[computationally secure] if breaking it is possible in principle but
@@ -290,13 +192,13 @@ and the mask) is needed for every message; reusing it breaks the guarantee.
 
 Together, the one-time pad and a Wegman-Carter authenticator provide
 information-theoretic confidentiality and integrity, but both demand a
-continuous supply of uniformly random secret key shared by the two
+continuous supply of, uniformly random, secret key shared by the two
 parties. Classical key exchange, the subject of the next section, does not
-provide such a supply unconditionally; it fails to provide more than computational secure keys.
+provide such a supply unconditionally, it fails to provide more than computational secure keys.
 
-== Classical key exchange in TLS <sec:classical-kx>
+== Classical key exchange in TLS
 
-The shared secret of the TLS handshake is produced by an authenticated
+The shared secret of Section 2.1 is produced by an authenticated
 Diffie-Hellman key exchange. In TLS 1.3 the only key-exchange family
 retained is #emph[ephemeral elliptic-curve Diffie-Hellman] (ECDHE)
 #cite(<rfc8446>). Each peer sends a public value derived from a fresh secret
@@ -305,7 +207,7 @@ value both sides arrive at the same point on an elliptic curve, which is
 then hashed into the shared secret fed to the key schedule. The curves used
 are standardised, most commonly P-256 #cite(<nist2023sp800186>) or
 Curve25519. Because the secrets are #emph[ephemeral] 
-(the secrets are used once then discarded), the exchange gains a property called forward secrecy, meaning that, recovering one session's key does
+(the secrets are used omce then discarded), the exchange gains a property called forward secrecy, meaning that, recovering one session's key does
 not compromise any other.
 
 The security of this exchange is #emph[computational]. An eavesdropper sees
@@ -325,7 +227,7 @@ of schemes once believed secure that were later broken when a better attack
 was found, and ECDLP is one of them: it is broken by Shor's algorithm on a
 quantum computer.
 
-== The quantum threat <sec:quantum-threat>
+== The quantum threat
 
 In 1994 Shor discovered a quantum algorithm that solves both integer factorisation
 and the discrete logarithm problem in polynomial time
@@ -340,8 +242,8 @@ elliptic-curve variant, are broken by this algorithm.
 The core of Shor's algorithm is #emph[order finding]: the hardness of these
 problems can be reduced to finding the period of a function, and a quantum
 computer finds that period efficiently using the #emph[quantum Fourier
-transform]. This works because a quantum computer can use
-superposition and interference to explore many states at once. What matters for this thesis is the consequence: this algorithm is what forces the need for information-theoretic primitives in the face of a future quantum adversary.
+transform]. This is done because of the the
+superposition and interference available to a quantum computer to explore more states. What matters for this thesis is the impact of this algorithm explaining the need for information-theoretic primitives in the face of a future quantum adversary.
 
 It needs to be taken note that the algorithm exists but the hardware does not yet: running Shor against the curve sizes
 used in practice requires a fault-tolerant quantum computer with far more
@@ -360,7 +262,7 @@ available, an attack known as #emph[harvest now, decrypt later]
 the arrival of quantum computers is therefore already at risk, even though
 no such machine exists yet.
 
-== Post-quantum cryptography <sec:pqc>
+== Post-quantum cryptography
 
 The first response to the quantum threat is to keep the classical
 architecture but replace the broken primitives with new ones believed to
@@ -399,7 +301,7 @@ ML-KEM is secure because no
 efficient algorithm for MLWE is known, exactly the kind of guarantee that
 Shor's algorithm overturned for ECDLP.
 
-== Quantum foundations <sec:quantum-foundations>
+== Quantum foundations
 
 The security of the key exchange in the next section rests on two physical
 facts about quantum measurement. This section establishes both. The physical
@@ -446,7 +348,7 @@ and forward the other untouched.
 
 Both facts rest on physics rather than on the hardness of a computation, so the protection they give against eavesdropping holds regardless of the adversary's computing power.
 
-== The BB84 protocol <sec:bb84>
+== The BB84 protocol
 
 BB84, due to Bennett and Brassard #cite(<bennett1984quantum>)#cite(<nielsen2010quantum>), turns the
 facts of the previous section into a way for two parties,
@@ -480,26 +382,6 @@ half the qubits survive sifting. @tab:bb84 illustrates one round.
   the matching positions form the sifted key.],
 ) <tab:bb84>
 
-#figure(
-  align(left)[#text(size: 9pt)[```python
-function bb84_round(n):
-    // sifted holds the positions where both sides chose the same basis
-    sifted <- empty list
-    for i = 1 .. n:
-        alice_bit   <- random bit
-        alice_basis <- random basis (Z or X)
-        bob_basis   <- random basis (Z or X)
-        qubit       <- encode(alice_bit, alice_basis)   // quantum channel
-        bob_bit     <- measure(qubit, bob_basis)
-        // sifting, over the authenticated public channel:
-        if alice_basis = bob_basis:        // bases announced, not bit values
-            append (alice_bit, bob_bit) to sifted
-    return sifted
-```]],
-  caption: [One round of BB84: per-qubit preparation and measurement, followed
-    by sifting on the positions where the two bases agree.],
-) <fig:bb84-pseudo>
-
 But realistically, the sifted key is not yet usable. Channel noise and any eavesdropping
 introduce disagreements between Alice's and Bob's versions, measured by the
 #emph[quantum bit error rate] (QBER), the fraction of sifted positions where
@@ -526,13 +408,13 @@ information leaked during reconciliation, together with whatever the
 eavesdropper may have gathered from the channel within the QBER bound, is
 removed by #emph[privacy amplification] #cite(<bennett1995generalized>):
 Alice and Bob apply a randomly chosen function from a universal family
-(the universal families of the security-models section) to compress their shared string into a shorter one about which
+(Section 2.2) to compress their shared string into a shorter one about which
 the eavesdropper's information is negligible. The leftover hash lemma
 #cite(<renner2005security>) quantifies how much the string must be shortened
 as a function of the eavesdropper's estimated knowledge. The result is a shared key whose secrecy rests on the
 laws of physics rather than on any computational assumption.
 
-== The ETSI QKD 014 key delivery standard <sec:etsi>
+== The ETSI QKD 014 key delivery standard
 
 ETSI GS QKD 014 standardises the interface through which an application
 requests keys from QKD hardware #cite(<etsi2019qkd014>). It separates the
@@ -552,12 +434,12 @@ master SAE requests new keys and receives them with their key_IDs; and
 `/dec_keys`, by which the slave SAE retrieves a key by its key_ID.
 
 This model carries a strong assumption: the two KMEs hold the keys in the
-clear and exchange them between sites, meaning the security of the delivered key
+clear and exchange them between sites meaning the security of the delivered key
 depends on each KME being uncompromised (in QKD terminology each KME is a
 #emph[trusted node]). The quantum guarantee covers the link between the QKD network, but the KMEs that store and forward the keys are trusted by
 assumption, not protected by physics.
 
-== Threat model <sec:threat-model>
+== Threat model
 
 The foundations above can now be combined into the adversary against which
 the rest of the thesis reasons. The adversary is assumed to be
