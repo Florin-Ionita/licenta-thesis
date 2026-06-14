@@ -507,9 +507,10 @@ their bits differ. Alice and Bob estimate it by publicly comparing the bits
 on a random sample of the sifted key and then discarding that sample. By the
 disturbance property, an eavesdropper who measures
 qubits in a basis she has guessed wrong corrupts them and so raises the
-QBER; an observed error rate above a protocol-dependent threshold signals
-interception and the key is aborted. A low QBER bounds how much information
-an eavesdropper can have obtained.
+QBER; an observed error rate above a threshold, derived from the Shor-Preskill
+security proof of BB84 #cite(<shor2000simple>), signals interception and the
+key is aborted. A low QBER bounds how much information an eavesdropper can have
+obtained.
 
 In the case the QBER is below that threshold, the remaining errors are removed by #emph[information
 reconciliation], a public-discussion procedure that lets Alice and Bob

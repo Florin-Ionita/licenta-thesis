@@ -3,11 +3,11 @@
 == Implementation overview
 
 The whole stack is implemented in Python and its libraries, with a single small
-component in C. Python's well developed libraries, together with it being an easy language 
+component in C. Python's well-developed libraries, together with it being an easy language
 to understand (which makes it easier to concentrate on the critical parts of the application), 
 made it the right choice for a research prototype whose goal is to show that 
-the protocol works and to measure its cost. The language has a cryptographic 
-system, supports asynchronous I/O, and lets the QKD layer, the KME, 
+the protocol works and to measure its cost. The language has strong cryptographic
+library support, supports asynchronous I/O, and lets the QKD layer, the KME,
 the QTLS endpoint, the benchmark harness and the dashboard all live in one 
 process and one event loop which keeps the demo in a single observable place. The one place where Python was not enough is the 
 Cascade reconciliation, which is written in C and called through `ctypes`.
@@ -73,8 +73,8 @@ The KME exposes its ETSI 014 interface with FastAPI #cite(<fastapi>).
 ETSI 014 is a REST interface with strict request and
 response formats, and FastAPI maps onto it directly: the data formats become
 Pydantic #cite(<pydantic>) models that validate every field against the
-standard, and the four endpoints become route handlers. A custom from scratch HTTP
-server was rejected because it would mean reimplementing validation and routing for no protocol gain.
+standard, and the four endpoints become route handlers. A custom HTTP server written from scratch
+was rejected because it would mean reimplementing validation and routing for no protocol gain.
 
 The SAE talks to the KME with httpx #cite(<httpx>), chosen over the more common
 requests library for two reasons: it is asynchronous, which fits the
@@ -85,7 +85,7 @@ without opening a real socket. A socket connection works with this implementatio
 Reconciliation runs the Cascade algorithm #cite(<brassard1994secret>),
 implemented in C language and loaded through `ctypes`. Cascade is the bottleneck of the
 key procedure because it makes many passes over the raw key, and a pure Python
-version was too slow to keep the key rate believable and semnificative. In case the C
+version was too slow to keep the key rate believable and significant. In case the C
 implementation cannot be run, the code will show an error and stop itself.
 
 The cryptographic primitives that are not information-theoretic, the HKDF key
@@ -114,7 +114,7 @@ to be critical parts of the stack and went through several iterations before rea
 Each KME holds its keys in a store indexed by identifier. When a master SAE
 requests a key, the store checks the access list, takes the oldest unused key,
 marks it reserved for that master and slave pair, and mirrors the reservation
-to the peer(slave KME) store before returning. The mirror happens while the shared lock is
+to the peer store (the slave KME) before returning. The mirror happens while the shared lock is
 still held, so the local mark and the peer reservation commit as one step,
 which is what stops the same key from being delivered on both ends.
 
@@ -250,7 +250,7 @@ amplification then shrinks the corrected key by at least that many bits, using
 a hash that removes whatever an eavesdropper could have learned, so the final
 key is bit-identical for both ends and secret. If Cascade fails to converge,
 the result is treated as an abort rather than a bad key. @fig:reconcile
-sketches the pipeline.
+sketches the algorithm.
 
 #figure(
   align(left)[#text(size: 9pt)[```python
@@ -272,8 +272,9 @@ function reconcile_and_amplify(alice, bob, qber):
         abort: failed to converge
 
     // Privacy amplification
-    shrink <- leaked + safety_margin              // bits to remove
-    key <- hash(alice) truncated to (len(alice) - shrink)
+    shrink         <- leaked + eve_information     // bits to remove
+    secure_length  <- len(alice) - shrink
+    key <- SHAKE128(alice).output(secure_length)   // variable-length hash
     return key      // identical on both ends, and secret
 ```]],
   caption: [The reconciliation and privacy-amplification pipeline. Cascade
@@ -283,7 +284,7 @@ function reconcile_and_amplify(alice, bob, qber):
 
 === QTLS endpoint
 
-The SAE is the component an application actually uses to send data; it ties
+The SAE is the component an application actually uses to send data and it ties
 together the KME client and the secure session. Each SAE owns a client to its
 local KME, through which it requests or resolves keys by identifier, and it
 speaks the QTLS protocol to the SAE at the other end. To the application above
@@ -294,163 +295,86 @@ obtained, the master pulls a fresh key and the slave resolves it by identifier,
 but once the session is up the two directions are independent and the roles no
 longer matter.
 
-The protocol is best understood as TLS 1.3 with one step replaced. Real TLS 1.3
-runs an (EC)DHE exchange so the two sides arrive at a shared secret; QTLS
+The protocol is best understood as TLS 1.3 with the (EC)DHE exchange replaced. QTLS
 removes that step and substitutes the QKD key looked up from the KME.
 Everything around it follows RFC 8446: the same message flow, the same
-transcript handling, the same Finished step. This is what lets the protocol be
-called TLS 1.3-shaped rather than a new design, and it is also where its
+transcript handling, the same Finished step. This makes it still be TLS like 
+and it is also where its
 guarantee changes, since the shared secret no longer comes from a computational
 assumption but from the quantum channel.
 
-That QKD key feeds a key schedule kept faithful to RFC 8446 section 7.1: the
-same `HKDF-Extract`, `Derive-Secret` and `HKDF-Expand-Label` structure that TLS
-uses, only with the QKD key as the input secret instead of a Diffie-Hellman
-output. From it the schedule derives the separate traffic keys for each
-direction, the material for the Finished messages, and the one-time-pad stream
-for the records. The HKDF primitives come from the `cryptography` library; only
-the labelling and structure are reimplemented, so the schedule can be shown to
-match the RFC.
+That QKD key feeds a key schedule that follows the structure of RFC 8446
+section 7.1, simplified to the secrets this protocol actually uses: a single
+`HKDF-Extract` from the QKD key, where TLS uses the (EC)DHE secret, with no
+pre shared key or early secret stage, followed by the same `Derive-Secret` and
+`HKDF-Expand-Label` steps and labels. From it the schedule derives the traffic
+keys for each direction, the material for the Finished messages, and the
+one-time-pad stream for the records.
 
 The handshake itself is a short state machine: the client sends its key
 identifier in the ClientHello, checks that the ServerHello echoes the same
 identifier, and the two sides exchange Finished messages. Authentication is
-where QTLS departs most visibly from TLS. There are no certificates or
-signatures on the data path; each side proves its identity simply by holding
-the same QKD key, demonstrated by the Finished message, a Wegman-Carter tag
-over the handshake transcript. A correct Finished proves both that the peer
-derived the same key and that the transcript was not tampered with,
-information-theoretically rather than computationally.
-
-The handshake messages are serialised as compact JSON rather than the
-byte-exact binary encoding TLS uses. A binary format would add a large amount
-of parsing code and no security, since the security comes from the keys and the
-Finished check, not from the wire encoding; the JSON form also keeps the
-handshake readable in packet captures. This is explicitly a presentation
-choice, not a security one.
+where QTLS departs most visibly from TLS, as there are no certificates or
+signatures: each side proves its identity simply by holding the same QKD key,
+demonstrated by the Finished message, a Wegman-Carter tag over the transcript
+that also proves the transcript was not tampered with. These messages are serialised as compact JSON
+rather than TLS's byte-exact binary, which adds parsing code but no security and
+keeps the handshake readable in captures.
 
 Once the handshake completes, the data path is protected with the
-information-theoretic primitives. Confidentiality comes from a one-time pad: the
-payload is combined by XOR with key bytes that are used once and never again.
-The key stream holds the QKD material behind an offset that only moves forward,
-so a byte cannot be handed out twice, and a request for more bytes than remain
-raises rather than wrapping, which turns key exhaustion into a hard stop.
-Integrity comes from a Wegman-Carter authenticator: the tag is a polynomial
-hash of the record over the field GF(2^128), the same field used by GHASH in
-AES-GCM, combined by XOR with a fresh one-time mask taken from the key stream.
-The only difference from AES-GCM is that mask: a true one-time pad instead of a
-block-cipher output, which is what makes forgery negligibly likely regardless
-of the attacker's computing power. The hash key may be reused across records;
-only the mask must be fresh, which costs 16 key bytes per record. Every record
-is sealed the same way, shown in @fig:record, consuming `len(payload) + 16` key
-bytes in a fixed order so the two ends stay in lockstep.
+information-theoretic primitives introduced in the background chapter.
+Confidentiality comes from a one-time pad: the payload is XOR-ed with key bytes
+drawn from the key stream, which holds the QKD material behind an offset that
+only moves forward, so a byte is never reused and a request for more than
+remains raises rather than wrapping, turning key exhaustion into a hard stop.
+Integrity comes from a Wegman-Carter tag whose one-time mask is taken fresh from
+the same key stream, the hash key is reused across records but the mask is not,
+which costs 16 key bytes per record on top of the payload. Every record is
+sealed the same way, shown in @fig:record, consuming `len(payload) + 16` key
+bytes in a fixed order, so both ends consume the same key bytes in the same
+order and stay synchronised without exchanging any extra information.
 
 #figure(
   align(left)[#text(size: 9pt)[```python
-function seal(plaintext):
-    ciphertext <- plaintext XOR key_stream.take(len(plaintext))  // one-time pad
-    r          <- key_stream.take(16)            // fresh mask, never reused
-    tag        <- wegman_carter(header + ciphertext, r)
+function seal(rtype, plaintext):
+    ciphertext <- plaintext XOR key_stream.take(len(plaintext))
+    mask          <- key_stream.take(16)        
+    header     <- pack(rtype, len(ciphertext))   // record type + length
+    tag        <- wegman_carter(header + ciphertext, mask)
     return header + ciphertext + tag
 ```]],
   caption: [Sealing one record: one-time-pad encryption followed by a
     Wegman-Carter tag, consuming payload-length plus 16 key bytes.],
 ) <fig:record>
 
-   IMPLEMENTATION CHAPTER - WRITING GUIDE (paragraph by paragraph)
+== Environment and setup
 
-   P1. Implementation overview
-        - Briefly restate what you built and in which language / toolchain.
-        - One or two sentences.
-        - Example (hardware):
-              "We implemented the Chisel number-representation library and its test-and-benchmark framework using the Chisel 3.5 hardware construction language, targeting Xilinx FPGAs via the Vivado toolchain."
-        - Example (software):
-              "We implemented the Scala-based number-representation library and integrated it into a Jenkins CI pipeline using sbt as the build tool, Docker for containerised test environments, and the GitHub Enterprise server for version control."
+The whole project is a single Python package, so setting it up takes one
+command after creating a virtual environment, and a `Makefile` wraps the common
+tasks so none of them have to be typed by hand. `make setup` creates the
+environment and installs the package together with its optional groups (the
+test, dashboard and benchmark dependencies). After that, `make demo` runs the
+command-line chat demo, `make dash` launches the live dashboard in the browser,
+`make test` runs the test suite, and `make bench` runs the quick benchmark
+profile. The only requirement beyond Python is a C compiler, used once to build
+the Cascade extension during installation. The project requires Python 3.12 or
+newer and @tab:deps lists the main libraries and the minimum versions the build
+pins.
 
-   P2. Technology choices and justification
-        - Explain why you picked each major technology (language, framework, hardware platform, CI system, etc.) and what alternatives you considered.
-        - Example (hardware paragraph):
-              "We chose Chisel over plain Verilog because it gives us parameterizable modules, type-safe elaboration, and easy generation of Verilog for FPGA synthesis. We considered SpinalHDL but stayed with Chisel for its richer ecosystem and better integration with the Chipyard toolbox. The Xilinx Artix-7 FPGA was selected because it is readily available in the university lab and provides a good balance of logic density and DSP slices for arithmetic experiments."
-        - Example (software paragraph):
-              "We selected Scala (with sbt) because it offers functional-programming abstractions, seamless interoperability with Java libraries, and excellent support for property-based testing (ScalaCheck). We evaluated Python but opted for Scala to keep the implementation type-safe and to leverage the existing Chisel code-generation tools. Jenkins was chosen over GitHub Actions or GitLab CI because our department already maintains a shared Jenkins master with Docker agents, providing reproducible build environments."
-
-   P3. Core algorithms and data structures
-        - Describe the key algorithms you implemented (e.g., arithmetic operators, conversion routines, test-generation strategies) and the main data structures that hold state.
-        - Avoid line-by-line code; focus on the idea.
-        - Example (hardware):
-              "For each supported format we implemented a parameterizable ripple-carry adder, a combinational multiplier using the Baugh-Wooley algorithm for two 's-complement numbers, and a CORDIC-based square-root unit. Conversion between formats is performed by first interpreting the bit-pattern as a rational number (sign  x mantissa  x 2^exp) and then re-encoding it in the target format using rounding-to-nearest-even."
-        - Example (software):
-              "The library defines an immutable case class `NumRep[F <: Format]` that holds the bit-pattern and provides methods `+`, `-`, `*`, `/`, and `toDouble`. Each format (IEEE-754 binary32, binary64, posit-8, posit-16, unum-like) extends a sealed trait `Format` that supplies the width, exponent size, and encoding/decoding functions. Test data are generated by property-based generators that sample uniformly from the representable range and also include edge-cases (zero, infinity, NaN, smallest subnormal)."
-
-   P4. Problems encountered & decisions made
-        - Narrate any significant obstacles (design bugs, tooling issues, performance surprises) and the decisions you took to resolve them.
-        - Example (hardware):
-              "During early synthesis we observed that the naïve ripple-carry adder failed to meet timing at 200 MHz. We replaced it with a carry-look-ahead adder (CLA) for widths > 16 bits, which restored timing with only a modest area increase. Another issue was that the Chisel-generated Verilog contained unnamed wires that caused simulation mismatches; we fixed this by explicitly naming all internal nodes using the `suggestName` directive."
-        - Example (software):
-              "The first attempt to run the test suite inside Docker containers failed because the JVM could not access the host 's `/dev/kvm` for hardware-accelerated benchmarks. We decided to run the benchmarks directly on the Jenkins agent (bare-metal Ubuntu) while keeping the build and unit-test steps inside Docker to preserve reproducibility. This hybrid approach gave us accurate power/energy measurements via RAPL without sacrificing isolated builds."
-
-   P5. Environment & setup instructions
-        - Provide a concise “how to run” guide: required software versions, hardware, and any configuration steps.
-        - Example (hardware):
-              "To reproduce the results you need:
-                • Vivado 2023.2 (or newer) for synthesis;
-                • Chisel 3.5.6 and firrtl 1.6;
-                • Scala 2.13.12 and sbt 1.9.8 for the test harness;
-                • A Xilinx Artix-7 FPGA board (e.g., Nexys A7) with at least 2 GB DDR3;
-                • Optional: Xilinx Power Estimator for post-place-and-route power numbers.
-              Clone the repository, run `sbt test` to execute the unit-test harness, then `make synth` to invoke the Vivado synthesis scripts."
-        - Example (software):
-              "To reproduce the results you need:
-                • Docker Engine 24.0+;
-                • OpenJDK 17 (for the sbt build);
-                • sbt 1.9.8;
-                • Jenkins 2.452 with the Docker plugin enabled;
-                • A Linux x86-64 machine with RAPL support (Intel i7-12700K or newer) for energy measurements;
-                • Git (≥ 2.40) for cloning.
-              After cloning, execute `./jenkins/jenkinsfile.sh` locally or push to the GitHub-Enterprise repository to trigger the Jenkins pipeline, which will publish the test and benchmark results as build artifacts."
-
-   P6. Pseudocode & summary tables (optional)
-        - Present high-level pseudocode for the main algorithms or a summary table of configurable parameters (e.g., format widths, iteration counts).
-        - Do not dump raw source files.
-        - Example (hardware pseudocode):
-              "Pseudocode for the parameterizable multiplier:
-              ```python
-                function multiply(a, b, w):
-                  // w = total bit-width
-                  // interpret a,b as signed two 's-complement integers
-                  prod = a * b
-                  // truncate to w bits (dropping overflow)
-                  return prod & ((1<<w)-1)"
-              ```"
-        - Example (hardware table):
-              "Summary table of supported formats:
-                #table(
-  columns: (5cm, 2cm, 3cm, 4cm),
-  align: (left, center, center, left),
-  [*Format*], [*Width*], [*Exponent bits*], [*Notes*],
-  [Fixed-point (Q8.8)], [16], [-], [ … ],
-  [IEEE-754 binary32], [32], [8], [ … ],
-  [Posit-8], [8], [0], [ … ],
-  [Posit-16], [16], [1], [ … ]
-)"
-        - Example (software pseudocode):
-              "Pseudocode for the posit addition operation:
-              ```python
-                function addPosit(p, q, es):
-                  // decode to signed regime, exponent, fraction
-                  v = decode(p, es); w = decode(q, es);
-                  r = v + w;
-                  return encode(r, es);"
-              ```"
-        - Example (software table):
-              "Summary table of format parameters:
-                #table(
-  columns: (5cm, 3cm, 4cm, 4cm),
-  align: (left, center, center, left),
-  [*Format*], [*Total bits*], [*Exponent size (es)*], [*Notes*],
-  [IEEE-754 binary32], [32], [8], [ … ],
-  [IEEE-754 binary64], [64], [11], [ … ],
-  [Posit-8], [8], [0], [ … ],
-  [Posit-16], [16], [1], [ … ],
-  [Unum-like], [32], [-], [ … ]
-)"
+#figure(
+  table(
+    columns: (auto, auto, auto),
+    align: (left, left, left),
+    table.header([*Library*], [*Min. version*], [*Used for*]),
+    [Qiskit / qiskit-aer], [1.2 / 0.15], [BB84 circuit simulation],
+    [NumPy], [1.26], [bit packing in reconciliation],
+    [FastAPI], [0.115], [ETSI 014 REST interface],
+    [Pydantic], [2.8], [request/response validation],
+    [httpx], [0.27], [SAE-side KME client],
+    [cryptography], [43], [HKDF, SHA-2, X.509],
+    [Streamlit / Plotly], [1.31 / 5.20], [live dashboard],
+    [pyperf], [2.6], [benchmark timing],
+    [pytest], [8.0], [test suite],
+  ),
+  caption: [Main dependencies and the minimum versions pinned by the build.],
+) <tab:deps>
