@@ -96,7 +96,10 @@ also relies on the trusted-node assumption from the ETSI 014 standard, and this
 is a genuine gap in the security model, not a detail: the KME sees the key in
 the clear. The data path is information-theoretically secure, but each KME is a
 point that has to be trusted, so the unconditional guarantee holds between
-endpoints only as far as the KMEs are honest.
+endpoints only as far as the KMEs are honest. The choice of ETSI 014
+#cite(<etsi2019qkd014>) has what can be considered an issue: it sends a fresh key identifier for
+every key, which never reveals the key itself but does leak usage metadata, where
+the session model of ETSI 004 #cite(<etsi2020qkd004>) is a more careful approach that keeps that tighter.
 
 On the implementation side, privacy amplification uses SHAKE-128 as a practical
 extractor instead of a mathematically pure universal hash family. The modular

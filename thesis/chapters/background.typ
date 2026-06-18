@@ -1,25 +1,25 @@
 #import "../prelude.typ": *
 
-Computing depends on communication between peers, and the problem it solves is
-old. Smoke signals were among the earliest forms of long-distance
+Computing depends on communication between peers and the problem it solves is
+old. Smoke signals were among the earliest forms of long distance
 communication, and they already worked the way every protocol since has: the
 two sides agreed beforehand on what a given puff or sequence meant, and that
 shared convention, not the smoke, carried the message. Modern communication is
-the same idea grown to large scale. For two parties to interoperate they follow
+the same idea grown to large scale meaning for two parties to communicate they follow
 shared standards that fix how a message is framed, how a session opens, and
 what each side may assume about the other. The Transport Layer Security
-protocol, described later in this chapter, is one such standard, and it carries most of the
+protocol, described later in this chapter, is an important standard, carrying most of the
 encrypted traffic on the Internet.
 
 Since the smoke, a lot has changed: communication has become an entire domain of its own, resting on a vast infrastructure that spans the planet and scales to almost any point on the globe. Most communication now happens between parties that have never met, across networks neither of them owns. A browser opens a session with a server it has no prior
-relationship with; a service calls another through infrastructure run by
+relationship with, a service calls another through infrastructure run by
 someone else entirely. The path a message takes is shared with unknown others,
-any of whom might read it or tamper with it along the way. A shared convention
+any of whom might read it or tamper with it along the way that leads to the fact that a shared convention
 is no longer enough by itself. Agreeing on what a message means does nothing to
 keep it private or intact while it crosses ground neither party trusts.
 
-This is why in communication it matters how it is secured.
-Security is not one property but several guarantees at once: that an outsider
+This is why in communication it became important to have a security layer.
+Security is not just one property but several guarantees at once: that an outsider
 cannot read the traffic, cannot alter it without being noticed, and is in fact
 the party it claims to be. These are confidentiality, integrity, and
 authentication, and a protocol like TLS exists to deliver all three over a
@@ -32,7 +32,7 @@ that expires in minutes only has to resist an attacker for minutes. A medical
 record or a state secret may need to stay confidential for decades, long enough
 that an adversary who just stores the traffic today and waits could still break
 it later. How much security is enough, and whether the strongest guarantee is
-even within reach, is itself part of the problem.
+even within reach, is one of communication's more important problems.
 
 All of this rests on an assumption that is rarely contested. The key
 exchange that protects almost every connection on the Internet is only
@@ -44,7 +44,7 @@ attack so far.
 This is a concern because the history of cryptography is full of
 algorithms that were trusted in their time and broken later, as computers grew
 faster and new algorithms were developed. The Data Encryption Standard (DES) algorithm was eventually broken by sheer brute force: in 1998 a
-purpose-built machine recovered a DES key in under three days
+purpose built machine recovered a DES key in under three days
 #cite(<eff1998crackingdes>), more than its 56-bit key could withstand. To continue on this idea, the hash function MD5, once used everywhere, was shown to admit
 practical collisions in 2004 #cite(<wang2005md5>), and SHA-1 followed in 2017
 when the first full collision was produced #cite(<stevens2017sha1>). In each
@@ -54,7 +54,7 @@ it had protected was exposed as a consequence.
 To put this in perspective, there are two main problems in communication
 security. The first is that computational security is always provisional: it
 lasts only until someone finds a better attack or builds a faster machine. The
-second is worse. A large enough quantum computer would not chip away at today's
+second is that a large enough quantum computer would not chip away at today's
 key exchange but break it completely, solving in reasonable time the very
 problems it is built on. Even though such a quantum computer does not exist yet,
 an adversary can store encrypted traffic now and decrypt it once the capability
@@ -70,16 +70,15 @@ There are two broad ways to defend communication against the quantum threat,
 and they differ at the root. The first keeps the architecture we already have
 and only replaces the broken pieces: the vulnerable key exchange is swapped for
 one built on mathematical problems that no known quantum algorithm can solve.
-This is the idea behind post-quantum cryptography, treated in detail in the
+This approach is called post-quantum cryptography, treated in detail in the
 post-quantum cryptography section later in this chapter. It runs on ordinary
 hardware and fits inside existing protocols, which makes it the path the wider
-Internet is taking. Its security, however, is still computational: it rests on
+Internet is taking. Its security, however, is still computational and it rests on
 an assumption about how hard a problem is, a stronger assumption than before but
 an assumption all the same, and one that a future attack could in principle
 overturn just as earlier ones did.
 
-The second way changes what the guarantee rests on. Instead of a problem that
-is merely hard to solve, it uses the laws of physics, which an adversary cannot
+The second way changes what the guarantee rests on and it uses the laws of physics, which an adversary cannot
 outcompute no matter how much power it has. Quantum key distribution takes this
 route: two parties derive a shared key whose secrecy follows from the behaviour
 of quantum measurement rather than from any unproven hardness, as the quantum
@@ -96,24 +95,22 @@ the classical exchange is broken. Notably, they discuss using the QKD key as a
 one-time pad but set that option aside as too costly, and protect the data with
 a conventional cipher such as AES-GCM instead. The transport therefore stays
 computationally secure: the QKD key improves how the secret is established, but
-the data is still guarded by a computational primitive. This thesis takes the
-option they declined. The QKD key is not handed to a block cipher but consumed
+the data is still guarded by a computational primitive. This thesis implements
+what the other attempt declined and makes it so that the QKD key is not handed to a block cipher but consumed
 directly by a one-time pad and a Wegman-Carter authenticator, so the
 confidentiality and integrity of the data are themselves information-theoretic,
 and the cost of doing so is exactly what this work sets out to measure.
 
 A related and now widely deployed line of work hardens the classical handshake
-without QKD at all. Hybrid key exchange, as specified for TLS 1.3 by Stebila et
+without QKD and using Hybrid key exchange, as specified for TLS 1.3 by Stebila et
 al. #cite(<stebila2025hybrid>), runs a post-quantum KEM such as ML-KEM
 alongside the ordinary elliptic-curve exchange and derives the session secret
 from both, so the connection holds as long as either component resists attack.
-This is the migration path the wider Internet is taking, and it is pragmatic:
+This is the migration path the Internet is taking, and it is pragmatic because
 it needs no new hardware and degrades gracefully. Its guarantee, however, is
 still computational on the data path, resting on the conjectured hardness of
 the lattice problem behind ML-KEM, detailed in the post-quantum cryptography
-section. This thesis takes the opposite position, keeping the data path purely
-information-theoretic and treating the computational assumptions as something
-to remove rather than to fall back on.
+section.
 
 == Goal and contributions
 
@@ -146,12 +143,12 @@ measuring handshake latency, bulk throughput, and per-record key consumption
 against a classical TLS 1.3 baseline, and comparing the key-establishment step
 against both X25519 and ML-KEM-768.
 
-An honest account of the boundary of the guarantee: a threat model that states
+An account of the boundary of the guarantee: a threat model that states
 plainly which parts are information-theoretic and which rest on assumptions
 (the authentication bootstrap and the trusted-node nature of the KMEs), so the
 claim is neither overstated nor hidden.
 
-== TLS 1.3 handshake <sec:tls>
+== TLS 1.3 handshake
 
 TLS 1.3 is the transport-layer protocol that secures the vast majority of
 encrypted traffic on the Internet today #cite(<rfc8446>). A TLS connection
@@ -211,11 +208,11 @@ that follows. Second, TLS 1.3 specifies the message flow and the key
 schedule, but the actual mechanism that produces the shared secret can be implemented in different variants. The next section makes precise what kind of security guarantee
 this primitive is expected to provide.
 
-== Security models and information-theoretic primitives <sec:security-models>
+== Security models and information-theoretic primitives
 
-Cryptographic guarantees come in two strengths. A scheme is
+Cryptographic guarantees come in two strengths: a scheme is
 #emph[computationally secure] if breaking it is possible in principle but
-requires an amount of computation that no realistic adversary can afford;
+requires an amount of computation that no realistic adversary can afford,
 its security rests on the assumed hardness of some problem, such as
 factoring or computing discrete logarithms. A scheme is
 #emph[information-theoretically secure] (ITS) if it cannot be broken
@@ -245,7 +242,7 @@ proved a price for it: perfect secrecy requires the key to be at least as
 long as the message and to be used only once.
 
 The #emph[one-time pad] (OTP) is the textbook cipher that attains this
-bound #cite(<vernam1926cipher>). Given a message $m$ and a uniformly random
+bound #cite(<shannon1949communication>). Given a message $m$ and a uniformly random
 key $k$ of the same length, used a single time, encryption and decryption
 are bitwise exclusive-or:
 
@@ -254,16 +251,16 @@ $ c = m xor k, quad m = c xor k. $ <eq:otp>
 Because $k$ is uniform and independent of $m$, every plaintext is equally
 consistent with a given $c$, so $I(M; C) = 0$. The OTP shows that perfect
 secrecy is achievable, but only at the cost Shannon identified: a fresh,
-truly random key as long as the data, never reused. Reusing any portion of
-the key is fatal for the secrecy.
+truly random key as long as the data, never reused because it will show
+the message due to the nature of the xor operation.
 
-Confidentiality is not integrity. An adversary who cannot read an
+An adversary who cannot read an
 OTP ciphertext can still flip chosen bits of the plaintext by flipping the
-corresponding bits of $c$. Protecting integrity with an
+corresponding bits of $c$. This means a communication can be confidential but it does not guarantee integrity. Protecting integrity with an
 information-theoretic guarantee requires a separate primitive: a
 #emph[message authentication code] built from a family of hash functions,
 following Wegman and Carter
-#cite(<wegman1981new>)#cite(<carter1979universal>). The idea is that the
+#cite(<wegman1981new>). The idea is that the
 sender does not use a single, fixed hash function, but picks one at random
 from a whole family $cal(H)$, and the secret key is exactly the choice of
 which function is used. Since the attacker does not know the key, it does
@@ -275,7 +272,7 @@ $cal(H)$ produces a collision with probability at most $epsilon$:
 $ Pr_(h in cal(H)) [h(m) = h(m')] <= epsilon. $ <eq:almost-universal>
 
 The tag itself is not just $h(m)$: the hash value is hidden by adding a
-fresh one-time random string, the #emph[mask], so that the transmitted tag
+fresh one-time random string (mask), so that the transmitted tag
 is $h(m) xor "mask"$. The mask stops the attacker from learning anything
 about which function was chosen from the tags it observes, just as the
 one-time pad hides the message.
@@ -286,15 +283,15 @@ which function was used and collisions are rare, the best it can do is
 guess, succeeding with probability at most $epsilon$, regardless of how much
 computation it performs, making it information-theoretic #cite(<stinson1991universal>). The cost, exactly as with the one-time pad,
 is that fresh, single-use key material (both the random choice of function
-and the mask) is needed for every message; reusing it breaks the guarantee.
+and the mask) is needed for every message.
 
 Together, the one-time pad and a Wegman-Carter authenticator provide
 information-theoretic confidentiality and integrity, but both demand a
 continuous supply of uniformly random secret key shared by the two
 parties. Classical key exchange, the subject of the next section, does not
-provide such a supply unconditionally; it fails to provide more than computational secure keys.
+provide such a supply unconditionally and it fails to provide more than computationally secure keys.
 
-== Classical key exchange in TLS <sec:classical-kx>
+== Classical key exchange in TLS
 
 The shared secret of the TLS handshake is produced by an authenticated
 Diffie-Hellman key exchange. In TLS 1.3 the only key-exchange family
@@ -325,13 +322,13 @@ of schemes once believed secure that were later broken when a better attack
 was found, and ECDLP is one of them: it is broken by Shor's algorithm on a
 quantum computer.
 
-== The quantum threat <sec:quantum-threat>
+== The quantum threat
 
 In 1994 Shor discovered a quantum algorithm that solves both integer factorisation
 and the discrete logarithm problem in polynomial time
-#cite(<shor1994algorithms>)#cite(<shor2000simple>). The same idea applies to
+#cite(<shor1994algorithms>). The same idea applies to
 the elliptic-curve discrete logarithm of @eq:ecdlp, so a sufficiently large
-quantum computer would recover the scalar $k$
+quantum computer would recover the scalar $k$ 
 efficiently, and with it the shared secret of an ECDHE handshake. This means that the two
 hard problems underlying essentially all deployed public-key cryptography,
 factoring for RSA and discrete logarithms for Diffie-Hellman and its
@@ -360,7 +357,7 @@ available, an attack known as #emph[harvest now, decrypt later]
 the arrival of quantum computers is therefore already at risk, even though
 no such machine exists yet.
 
-== Post-quantum cryptography <sec:pqc>
+== Post-quantum cryptography
 
 The first response to the quantum threat is to keep the classical
 architecture but replace the broken primitives with new ones believed to
@@ -387,7 +384,7 @@ $ b_i = chevron.l a_i, s chevron.r + e_i, $ <eq:lwe>
 
 where the $a_i$ are random, $chevron.l dot, dot chevron.r$ is the inner product,
 and each $e_i$ is a small random error. Without the errors this is ordinary
-linear algebra and $s$ is trivially recovered; the small noise terms $e_i$
+linear algebra and $s$ is trivially recovered, but the small noise terms $e_i$
 are what make the problem hard, and no efficient algorithm, classical or
 quantum, is known to solve it for suitable parameters. 
 
@@ -399,7 +396,7 @@ ML-KEM is secure because no
 efficient algorithm for MLWE is known, exactly the kind of guarantee that
 Shor's algorithm overturned for ECDLP.
 
-== Quantum foundations <sec:quantum-foundations>
+== Quantum foundations
 
 The security of the key exchange in the next section rests on two physical
 facts about quantum measurement. This section establishes both. The physical
@@ -446,7 +443,7 @@ and forward the other untouched.
 
 Both facts rest on physics rather than on the hardness of a computation, so the protection they give against eavesdropping holds regardless of the adversary's computing power.
 
-== The BB84 protocol <sec:bb84>
+== The BB84 protocol
 
 BB84, due to Bennett and Brassard #cite(<bennett1984quantum>)#cite(<nielsen2010quantum>), turns the
 facts of the previous section into a way for two parties,
@@ -507,15 +504,14 @@ their bits differ. Alice and Bob estimate it by publicly comparing the bits
 on a random sample of the sifted key and then discarding that sample. By the
 disturbance property, an eavesdropper who measures
 qubits in a basis she has guessed wrong corrupts them and so raises the
-QBER; an observed error rate above a threshold, derived from the Shor-Preskill
+QBER. An observed error rate above a threshold, derived from the Shor-Preskill
 security proof of BB84 #cite(<shor2000simple>), signals interception and the
 key is aborted. A low QBER bounds how much information an eavesdropper can have
 obtained.
 
 In the case the QBER is below that threshold, the remaining errors are removed by #emph[information
 reconciliation], a public-discussion procedure that lets Alice and Bob
-correct the differing bits and reach an identical string. The implementation chosen for this work uses Cascade #cite(<brassard1994secret>)
-#cite(<martinez2015demystifying>), which proceeds in passes: the key is split
+correct the differing bits and reach an identical string. The implementation chosen for this work uses Cascade #cite(<brassard1994secret>), which proceeds in passes: the key is split
 into blocks, parities of the blocks are compared, and a binary search inside
 any block with mismatched parity locates and flips the problem bit, with
 later passes catching errors the earlier ones missed. Reconciliation leaks
@@ -528,12 +524,11 @@ eavesdropper may have gathered from the channel within the QBER bound, is
 removed by #emph[privacy amplification] #cite(<bennett1995generalized>):
 Alice and Bob apply a randomly chosen function from a universal family
 (the universal families of the security-models section) to compress their shared string into a shorter one about which
-the eavesdropper's information is negligible. The leftover hash lemma
-#cite(<renner2005security>) quantifies how much the string must be shortened
-as a function of the eavesdropper's estimated knowledge. The result is a shared key whose secrecy rests on the
+the eavesdropper's information is negligible. How much the string must be
+shortened depends on how much the eavesdropper is estimated to know. The result is a shared key whose secrecy rests on the
 laws of physics rather than on any computational assumption.
 
-== The ETSI QKD 014 key delivery standard <sec:etsi>
+== The ETSI QKD 014 key delivery standard
 
 ETSI GS QKD 014 standardises the interface through which an application
 requests keys from QKD hardware #cite(<etsi2019qkd014>). It separates the
@@ -558,7 +553,7 @@ depends on each KME being uncompromised (in QKD terminology each KME is a
 #emph[trusted node]). The quantum guarantee covers the link between the QKD network, but the KMEs that store and forward the keys are trusted by
 assumption, not protected by physics.
 
-== Threat model <sec:threat-model>
+== Threat model
 
 The foundations above can now be combined into the adversary against which
 the rest of the thesis reasons. The adversary is assumed to be

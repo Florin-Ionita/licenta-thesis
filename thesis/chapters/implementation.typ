@@ -52,8 +52,15 @@ kind of final key block. The first is a
 simulation built on Qiskit #cite(<qiskit2024>): one round of BB84 is expressed
 as a real quantum circuit and run on the AerSimulator using the stabilizer
 method, which handles many qubits per round almost instantly because BB84 only
-uses Clifford gates. @fig:bb84-circuit shows one such round for four qubits,
-covering every combination of preparation and measurement basis.
+uses Clifford gates. @fig:bb84-circuit shows one round on four qubits, chosen so the four
+combinations of preparation and measurement basis all appear. On $q_0$ Alice
+prepares bit $0$ in the Z basis and Bob measures in Z as well, so the bases
+match and the bit is kept. On $q_1$ Alice sends bit $1$ in Z but Bob measures in
+X: the bases differ and the result is discarded during sifting. On $q_2$ both
+use the X basis (Alice applies X then H to encode a $1$, Bob applies H before
+measuring), the bases match and the bit survives. On $q_3$ Alice prepares in X
+while Bob measures in Z, another mismatch that is dropped. Two of the four
+positions survive sifting and form the sifted key for this round.
 
 #figure(
   image("/docs/figures/bb84_circuit_demo.pdf", width: 80%),
@@ -162,7 +169,7 @@ than by which caller invoked it.
 Microbenchmarks confirmed that at the demo's concurrency level this shared lock
 is not a bottleneck.
 
-This is a simplified synchronisation implementation that works and lets off some
+This is a simplified synchronisation that works and avoids a lot of
 complexity. A production
 KME would replace the shared lock with a proper distributed protocol such as
 two-phase commit, but the rest of the storage and API code would be unaffected
@@ -170,32 +177,27 @@ by that substitution.
 
 ==== Scope of the ETSI 014 implementation
 
-The KME component implements the *single-pair* subset of ETSI GS QKD 014
+The KME component implements the single pair subset of ETSI GS QKD 014
 V1.1.1: one master SAE, one slave SAE, and one peer KME on the other end of
 the QKD link. Multicast key delivery to multiple slave SAEs (the optional
 `additional_slave_SAE_IDs` field of the Key request data format in clause 6.2 of
-the standard) is out of scope, as is the
-vendor and forward-compatibility extension surface
-(`extension_mandatory`, `extension_optional`, `status_extension`,
-`key_extension`, `key_ID_extension`, `key_container_extension`). The endpoints
-that the standard prescribes #cite(<etsi2019qkd014>) are exposed in full
-(`GET /status`, `GET`/`POST /enc_keys`, `GET`/`POST /dec_keys`), with the
+the standard) is out of scope. The endpoints
+that the standard prescribes #cite(<etsi2019qkd014>) are exposed
+(`GET /status`, `GET`/`POST /enc_keys`, `GET`/`POST /dec_keys`) with the
 request and response data formats matching the standard verbatim for every
-field that lies inside that single-pair scope. An example of a status response 
+field that lies inside that single pair scope. An example of a status response 
 carries `source_KME_ID`, `target_KME_ID`,
 `key_size` and `stored_key_count`, and a delivered key is a `key_ID` paired
 with its Base64-encoded `key` material. Each format is a Pydantic model, so a
 request or response that does not match the standard's shape is rejected before
 it reaches any protocol logic.
 
-Not implementing the forward forward-compatibility and extension functionalities
-was done in favor to not make the thesis add a
-substantial amount of KME-to-KME coordination logic without
-changing any of the properties the thesis evaluates: key-ID synchronisation,
-no-reuse, ETSI wire-format conformance, and the cost of staying
-information-theoretically secure on the application data path. In case this functionality
-wants to be developed it would require to extend the existing `KeyStore`
-mirror mechanism rather than restructure it.
+Forward-compatibility and extension support were left out so the thesis would
+not have to add a big pile of KME-to-KME coordination logic that does not change
+any of the properties it evaluates: key-ID synchronisation, no-reuse, ETSI
+wire-format conformance, and the cost of staying information-theoretically
+secure on the application data path. If this functionality were developed, it
+would extend the existing `KeyStore` mirror mechanism rather than restructure it.
 
 ==== Authentication and the mTLS gap
 
@@ -221,7 +223,7 @@ no-reuse, and ETSI wire-format conformance are all determined by the key store
 and the route handlers, none of which depend on the identification method.
 Authentication here is a property of the surrounding infrastructure, so we simplify
  it to a header and keep identity
-resolution in one place. A upgrade would be implemented by serving
+resolution in one place. An upgrade would be implemented by serving
 the KME over real sockets with mTLS and extracting the CN from the verified
 peer certificate and because `current_sae` is the only place identity is resolved,
 that upgrade touches no other module.
@@ -298,10 +300,9 @@ longer matter.
 The protocol is best understood as TLS 1.3 with the (EC)DHE exchange replaced. QTLS
 removes that step and substitutes the QKD key looked up from the KME.
 Everything around it follows RFC 8446: the same message flow, the same
-transcript handling, the same Finished step. This makes it still be TLS like 
-and it is also where its
-guarantee changes, since the shared secret no longer comes from a computational
-assumption but from the quantum channel.
+transcript handling, the same Finished step. This keeps it TLS-like, and it is
+also where its guarantee changes, since the shared secret no longer comes from a
+computational assumption but from the quantum channel.
 
 That QKD key feeds a key schedule that follows the structure of RFC 8446
 section 7.1, simplified to the secrets this protocol actually uses: a single
@@ -325,8 +326,8 @@ Once the handshake completes, the data path is protected with the
 information-theoretic primitives introduced in the background chapter.
 Confidentiality comes from a one-time pad: the payload is XOR-ed with key bytes
 drawn from the key stream, which holds the QKD material behind an offset that
-only moves forward, so a byte is never reused and a request for more than
-remains raises rather than wrapping, turning key exhaustion into a hard stop.
+only moves forward, so a byte is never reused and a request for more bytes than
+remain raises an error rather than wrapping, turning key exhaustion into a hard stop.
 Integrity comes from a Wegman-Carter tag whose one-time mask is taken fresh from
 the same key stream, the hash key is reused across records but the mask is not,
 which costs 16 key bytes per record on top of the payload. Every record is

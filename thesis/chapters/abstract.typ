@@ -1,7 +1,9 @@
 #import "../prelude.typ": *
 
    ABSTRACT WRITING GUIDE (sentence by sentence)
-
+ - todo uri:
+  - de explicat schema cu circuitul quantum, de reviewuit introducerea
+  - la etsi sa nu intru asa in detaliu
    1. Domain -one sentence: broad field of the thesis.
         e.g., "This thesis lies in the field of computer architecture and hardware accelerators."
         e.g., "This thesis lies in the field of scientific computing and high-performance numerical methods."

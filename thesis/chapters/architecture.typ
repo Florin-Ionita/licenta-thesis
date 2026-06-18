@@ -73,17 +73,17 @@ would defeat the purpose of the thesis.
 
 This section breaks the system into its functional blocks. For each block we
 state what it is responsible for and what it exposes to the others, but not how
-it works inside; the internal algorithms are left for the implementation
-chapter.
+it works inside. We give only the constraints each block must respect, so that
+anyone implementing a block knows what it has to satisfy.
 
 === Secure application entity (SAE)
 
 The SAE is the application-facing end of the system. Its point is to send data
 securely to the other endpoint, and it hides everything about QKD behind a
-familiar connection interface. An SAE does two things. First, it obtains a key
+familiar connection interface. An SAE obtains a key
 from its local KME over the ETSI interface: the client SAE pulls a fresh key
 and gets back a key identifier together with the key, and the server SAE later
-resolves that same identifier into the same key. Second, it runs a TLS-style
+resolves that same identifier into the same key. In addition, it runs a TLS-style
 handshake with the SAE on the other end, which carries the key identifier as an
 authentication mechanism to prove that both sides hold the same QKD key without
 ever sending the key over the wire. After that, the rest of the communication
@@ -103,7 +103,7 @@ established the roles no longer matter and the two ends are interchangeable.
 === Key management entity (KME)
 
 The KME sits between the QKD endpoint and the SAE. The QKD endpoint produces a
-stream of raw key material but knows nothing about who wants it; the KME turns
+stream of raw key material but knows nothing about who wants it. The KME turns
 that stream into a service an application can actually use. In practice, it
 stores the material it receives, gives each key an identifier, and hands keys
 out on request, while making sure a key is never given to an SAE that is
